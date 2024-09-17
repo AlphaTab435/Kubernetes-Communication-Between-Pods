@@ -1,0 +1,115 @@
+# Deployment for database
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongoDB-replica-set
+  template:
+    metadata:
+      labels:
+        app: mongoDB-replica-set
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:latest
+          ports:
+            - containerPort: 27017
+---
+# Service for DataBase
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo
+spec:
+  selector:
+    app: mongoDB-replica-set
+  ports:
+    - protocol: TCP
+      port: 27017
+      targetPort: 27017
+  type: ClusterIP # Internal service for accessing from inside the cluster
+  # type: NodePort # Internal service for accessing from inside the cluster
+---
+# Deployment for backend
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend-replica-set
+  template:
+    metadata:
+      labels:
+        app: backend-replica-set
+    spec:
+      containers:
+        - name: backend
+          image: muhammadtabish/mcqs_backend:latest
+          ports:
+            - containerPort: 3000
+      initContainers:
+        - name: wait-for-mongo
+          image: busybox
+          command:
+            [
+              "sh",
+              "-c",
+              "until nc -z mongo 27017; do echo waiting for mongo; sleep 2; done;",
+            ]
+---
+# Service for Backend
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  selector:
+    app: backend-replica-set
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+  type: NodePort # External service for accessing from outside the cluster
+
+---
+# Deployment for frontend
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend-replica-set
+  template:
+    metadata:
+      labels:
+        app: frontend-replica-set
+    spec:
+      containers:
+        - name: backend
+          image: muhammadtabish/mcqs_frontend_already_build:latest
+          ports:
+            - containerPort: 80
+---
+# Service for Frontend
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+spec:
+  selector:
+    app: frontend-replica-set
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: NodePort # External service for accessing from outside the cluster
